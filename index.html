@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FlowDesk AI Voice Sales Bot</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#14182b;--mu:#6b7189;--bd:#e3e6f0;--pr:#4f46e5;--bot:#eef0ff;--cu:#e8f7ef;--ok:#16a34a;--bad:#dc2626;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1220;--card:#181c30;--tx:#eceefa;--mu:#9aa0bd;--bd:#2a2f4a;--bot:#232850;--cu:#173528}}
+:root[data-theme="dark"]{--bg:#0f1220;--card:#181c30;--tx:#eceefa;--mu:#9aa0bd;--bd:#2a2f4a;--bot:#232850;--cu:#173528}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:var(--card);border-bottom:1px solid var(--bd);flex-wrap:wrap;gap:8px}
+h1{font-size:18px;margin:0}nav button{background:none;border:0;color:var(--mu);font:inherit;padding:8px 14px;cursor:pointer;border-radius:8px}nav button.on{background:var(--pr);color:#fff}
+main{max-width:1000px;margin:0 auto;padding:16px}.grid{display:grid;grid-template-columns:1fr 300px;gap:16px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px}
+#chat{height:60vh;min-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.b{max-width:80%;padding:9px 13px;border-radius:14px}.b small{display:block;color:var(--mu);font-size:11px}.bot{background:var(--bot);align-self:flex-start}.cus{background:var(--cu);align-self:flex-end}.int{opacity:.6;font-style:italic}
+.btn{border:0;border-radius:10px;padding:11px 16px;font:inherit;font-weight:600;cursor:pointer;width:100%;margin-top:8px;color:#fff;background:var(--pr)}.btn:disabled{opacity:.4;cursor:not-allowed}.btn.red{background:var(--bad)}.btn.gh{background:none;color:var(--tx);border:1px solid var(--bd)}
+select{width:100%;padding:9px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit}
+.timer{font-size:34px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums;margin:8px 0}
+.st{display:flex;align-items:center;gap:8px;justify-content:center;font-weight:600}.dot{width:12px;height:12px;border-radius:50%;background:var(--mu)}
+.Listening .dot{background:var(--ok);animation:p 1s infinite}.Speaking .dot{background:var(--pr);animation:p .6s infinite}.Thinking .dot{background:#f59e0b;animation:p .8s infinite}.Connecting .dot{background:#f59e0b}@keyframes p{50%{transform:scale(1.5);opacity:.6}}
+.badge{display:inline-block;padding:3px 11px;border-radius:99px;color:#fff;font-weight:600;font-size:13px;background:var(--mu)}
+.Converted{background:#16a34a}.Interested{background:#2563eb}.Follow-up{background:#d97706}.NotInt{background:#dc2626}.Demo{background:#7c3aed}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:5}.modal .card{max-width:440px}
+.hide{display:none!important}.mu{color:var(--mu);font-size:13px}ul{margin:4px 0 10px;padding-left:20px}audio{width:100%;margin:6px 0}
+details{border:1px solid var(--bd);border-radius:12px;padding:10px 14px;margin-bottom:10px;background:var(--card)}summary{cursor:pointer;font-weight:600}
+</style></head><body>
+<header><h1>🎙️ FlowDesk Voice Sales Bot</h1><nav><button id="n1" class="on">Call</button><button id="n2">History</button></nav></header>
+<main>
+<div id="warn" class="card hide"></div>
+<section id="v1"><div class="grid">
+<div class="card"><div id="chat"><div class="mu" style="margin:auto">Accept the consent, then press Start Call.</div></div></div>
+<div class="card"><label class="mu">Language / भाषा</label>
+<select id="lang"><option value="en">English (en-IN)</option><option value="hi">हिन्दी (hi-IN)</option></select>
+<div class="timer" id="tm">00:00</div>
+<div class="st Idle" id="st"><span class="dot"></span><span id="stt">Idle</span></div>
+<button class="btn" id="start" disabled>Start Call</button>
+<button class="btn red" id="end" disabled>End Call</button>
+<p class="mu" id="recnote">Recording captures your microphone only. The bot’s voice comes from the browser speech engine, which browsers cannot record. The bot’s lines are saved in the transcript.</p></div>
+</div>
+<div id="res" class="card hide" style="margin-top:16px"></div></section>
+<section id="v2" class="hide"><div id="hist"></div></section>
+</main>
+<div class="modal" id="consent"><div class="card"><h2 style="margin-top:0">Recording consent</h2>
+<p>This call is recorded for quality and for generating a summary. The audio, transcript and summary are saved in this browser only.</p>
+<label><input type="checkbox" id="chk"> I understand and consent to the recording.</label>
+<button class="btn" id="agree" disabled>I agree</button></div></div>
+<script>
+const $=id=>document.getElementById(id);
+async function ask(prompt){const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt})});if(!r.ok)throw new Error("api");return (await r.json()).text}
+function parseJ(t){return JSON.parse(t.replace(/```json|```/g,"").trim())}
+const KB=`Product: FlowDesk, a CRM and sales automation tool for small and mid-size teams.
+Features: contact and deal pipeline, automated follow-up emails, WhatsApp and email integration, sales reports dashboard, task reminders.
+Plans: Starter ₹999 per user per month (up to 3 users, basic pipeline); Growth ₹2,499 per user per month (automation, integrations, reports); Scale ₹4,999 per user per month (advanced analytics, priority support, custom roles).
+Free trial: 14 days, no credit card needed. Demo: a 20 minute live demo can be booked any weekday.
+Objections: Price: start with the free trial and the Starter plan, teams usually recover the cost through faster follow-ups. Timing: setup takes under an hour and data import is free. Competitors: FlowDesk is simpler and built for Indian teams with WhatsApp built in. Trust: data is encrypted and the trial needs no card.`;
+const STAT=["Converted","Interested","Follow-up Required","Not Interested","Demo Requested","No Response"];
+const cls=s=>({"Converted":"Converted","Interested":"Interested","Follow-up Required":"Follow-up","Not Interested":"NotInt","Demo Requested":"Demo"}[s]||"");
+const L={en:{code:"en-IN",greet:"Hello! This is Riya from FlowDesk. Quick note: this call is being recorded. May I ask about your business, and how you manage your sales today?",re:"Are you still there? I’d love to hear what you think.",bye:"I haven’t heard from you, so I’ll end the call now. Thank you, have a great day!",lg:"English"},
+hi:{code:"hi-IN",greet:"नमस्ते! मैं रिया बोल रही हूँ, फ्लोडेस्क से। ध्यान दें, यह कॉल रिकॉर्ड की जा रही है। क्या मैं आपके बिज़नेस और आपकी सेल्स मैनेजमेंट के बारे में कुछ पूछ सकती हूँ?",re:"क्या आप अभी भी लाइन पर हैं? आपकी राय जानकर अच्छा लगेगा।",bye:"मुझे कोई जवाब नहीं मिला, इसलिए मैं कॉल समाप्त कर रही हूँ। धन्यवाद, आपका दिन शुभ हो!",lg:"Hindi"}};
+let S={on:false,lang:"en",msgs:[],t0:0,tick:0,rec:null,stream:null,mr:null,chunks:[],silT:0,fails:0,gen:0,speaking:false,busy:false};
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR||!window.speechSynthesis){const w=$("warn");w.classList.remove("hide");w.textContent="Your browser doesn’t support speech recognition. Please open this page in Google Chrome on desktop or Android.";}
+function status(s){$("st").className="st "+s;$("stt").textContent=s;S.status=s}
+status("Idle");
+$("chk").onchange=e=>$("agree").disabled=!e.target.checked;
+$("agree").onclick=()=>{$("consent").classList.add("hide");$("start").disabled=!SR};
+$("n1").onclick=()=>tab(1);$("n2").onclick=()=>{tab(2);renderHist()};
+function tab(n){$("v1").classList.toggle("hide",n!=1);$("v2").classList.toggle("hide",n!=2);$("n1").classList.toggle("on",n==1);$("n2").classList.toggle("on",n==2)}
+// IndexedDB
+const dbp=new Promise((res,rej)=>{try{const r=indexedDB.open("flowdesk",1);r.onupgradeneeded=()=>r.result.createObjectStore("calls",{keyPath:"id"});r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)}catch(e){res(null)}});
+async function dbPut(c){const d=await dbp;if(!d)return;return new Promise(r=>{const t=d.transaction("calls","readwrite");t.objectStore("calls").put(c);t.oncomplete=r;t.onerror=r})}
+async function dbAll(){const d=await dbp;if(!d)return[];return new Promise(r=>{const q=d.transaction("calls").objectStore("calls").getAll();q.onsuccess=()=>r(q.result.sort((a,b)=>b.id-a.id));q.onerror=()=>r([])})}
+// chat
+function bubble(role,text,interim){const c=$("chat");if(c.firstElementChild&&c.firstElementChild.classList.contains("mu"))c.innerHTML="";let d=interim&&c.querySelector(".int");if(!d){d=document.createElement("div");c.appendChild(d)}d.className="b "+(role=="bot"?"bot":"cus")+(interim?" int":"");d.innerHTML="<small>"+(role=="bot"?"Riya (Bot)":"You")+"</small>";d.appendChild(document.createTextNode(text));c.scrollTop=c.scrollHeight}
+function clearInt(){const i=$("chat").querySelector(".int");if(i)i.remove()}
+// speech out
+function voiceFor(code){const v=speechSynthesis.getVoices();return v.find(x=>x.lang.replace("_","-")==code)||v.find(x=>x.lang.startsWith(code.slice(0,2)))}
+function speak(text){return new Promise(res=>{const g=S.gen;stopRec();status("Speaking");S.speaking=true;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=L[S.lang].code;const v=voiceFor(u.lang);if(v)u.voice=v;u.rate=1;const done=()=>{S.speaking=false;res(g==S.gen)};u.onend=done;u.onerror=done;speechSynthesis.speak(u)})}
+// speech in
+function stopRec(){clearTimeout(S.silT);if(S.rec){S.rec.onend=null;S.rec.onresult=null;try{S.rec.abort()}catch(e){}S.rec=null}}
+function listen(){if(!S.on)return;const g=S.gen;stopRec();status("Listening");const r=new SR();S.rec=r;r.lang=L[S.lang].code;r.continuous=true;r.interimResults=true;let got=false;
+r.onresult=e=>{let fin="",it="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;e.results[i].isFinal?fin+=t:it+=t}
+ if(it||fin){got=true;clearTimeout(S.silT)}
+ if(it&&!fin)bubble("cus",it,true);
+ if(fin.trim()){clearInt();stopRec();S.fails=0;userSaid(fin.trim())}};
+r.onerror=e=>{if(e.error=="not-allowed"||e.error=="service-not-allowed"){alert("Microphone permission was denied. Please allow microphone access and try again.");endCall()}};
+r.onend=()=>{if(S.on&&S.rec===r&&g==S.gen&&S.status=="Listening")setTimeout(()=>{if(S.rec===r)listen()},150)};
+try{r.start()}catch(e){}
+S.silT=setTimeout(()=>silence(g),10000)}
+async function silence(g){if(!S.on||g!=S.gen)return;S.fails++;if(S.fails>=3){await speak(L[S.lang].bye);bubbleBot(L[S.lang].bye);return endCall()}
+ bubbleBot(L[S.lang].re);if(await speak(L[S.lang].re))listen()}
+function bubbleBot(t){S.msgs.push({r:"bot",t});bubble("bot",t)}
+async function userSaid(t){S.msgs.push({r:"cus",t});bubble("cus",t);status("Thinking");const g=S.gen;let reply;
+ try{ const convo=S.msgs.map(m=>(m.r=="bot"?"Riya: ":"Customer: ")+m.t).join("\n");
+ reply=(await ask(`You are Riya, a friendly sales rep on a live voice call selling FlowDesk. Reply in ${L[S.lang].lg}${S.lang=="hi"?" (Devanagari script)":""}. Use 1 to 3 short spoken sentences, no lists or markdown. Flow: ask discovery questions about their business, explain only relevant features, handle objections empathetically, then offer the free trial or a demo and ask for name and email if interested. Never invent features, discounts or facts beyond the knowledge base. Never be pushy; if they decline, accept politely and say goodbye.\n\nKNOWLEDGE BASE:\n${KB}\n\nCONVERSATION SO FAR:\n${convo}\n\nWrite only Riya’s next reply.`)).trim()}
+ catch(e){reply=S.lang=="hi"?"माफ़ कीजिए, कनेक्शन में दिक्कत है। क्या आप दोबारा बोल सकते हैं?":"Sorry, I had a connection hiccup. Could you say that again?"}
+ if(!S.on||g!=S.gen)return;bubbleBot(reply);if(await speak(reply))listen()}
+// call lifecycle
+const fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+$("start").onclick=async()=>{S={...S,on:true,lang:$("lang").value,msgs:[],fails:0,chunks:[],gen:S.gen+1};$("res").classList.add("hide");$("chat").innerHTML="";$("lang").disabled=true;$("start").disabled=true;status("Connecting");
+ try{S.stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){alert("Microphone access is needed for the call. Please allow it in your browser and try again.");S.on=false;$("lang").disabled=false;$("start").disabled=false;return status("Idle")}
+ try{const mr=new MediaRecorder(S.stream);mr.ondataavailable=e=>e.data.size&&S.chunks.push(e.data);mr.start(1000);S.mr=mr}catch(e){S.mr=null}
+ S.t0=Date.now();$("tm").textContent="00:00";S.tick=setInterval(()=>$("tm").textContent=fmt(Math.floor((Date.now()-S.t0)/1000)),500);$("end").disabled=false;
+ speechSynthesis.getVoices();const g=L[S.lang].greet;bubbleBot(g);if(await speak(g))listen()};
+$("end").onclick=()=>endCall();
+async function endCall(){if(!S.on)return;S.on=false;S.gen++;stopRec();speechSynthesis.cancel();clearInterval(S.tick);$("end").disabled=true;status("Ended");
+ const dur=Math.floor((Date.now()-S.t0)/1000);const msgs=S.msgs.slice();
+ const blob=await new Promise(r=>{if(!S.mr||S.mr.state=="inactive")return r(null);S.mr.onstop=()=>r(S.chunks.length?new Blob(S.chunks,{type:S.mr.mimeType||"audio/webm"}):null);S.mr.stop()});
+ if(S.stream)S.stream.getTracks().forEach(t=>t.stop());
+ const call={id:Date.now(),date:new Date().toISOString(),dur,lang:S.lang,msgs,blob,summary:null};
+ const box=$("res");box.classList.remove("hide");box.innerHTML="<b>Generating AI summary…</b>";
+ call.summary=await summarize(msgs);await dbPut(call);box.innerHTML=callHTML(call,true);bindAudio(box,call);
+ $("lang").disabled=false;$("start").disabled=!SR;status("Idle")}
+async function summarize(msgs){const spoke=msgs.some(m=>m.r=="cus");
+ const nr={summary:"The customer did not speak during the call.",requirements:[],objections:[],next_steps:["Try reaching the customer again"],status:"No Response",reason:"No customer speech."};
+ if(!spoke)return nr;
+ try{const tr=msgs.map(m=>(m.r=="bot"?"Bot: ":"Customer: ")+m.t).join("\n");
+ const j=parseJ(await ask(`Analyze this sales call transcript for FlowDesk. Return ONLY valid JSON: {"summary":"...","requirements":["..."],"objections":["..."],"next_steps":["..."],"status":"<exactly one of: Converted, Interested, Follow-up Required, Not Interested, Demo Requested, No Response>","reason":"<one line why>"}.\nStatus rules: Converted = customer clearly agrees to buy or sign up; Demo Requested = asks for or agrees to a demo; Interested = positive but no commitment or demo; Follow-up Required = needs time, wants to consult someone or asks to be contacted later; Not Interested = explicitly declines; No Response = customer never spoke or silence.\n\nTRANSCRIPT:\n${tr}`));
+ if(!STAT.includes(j.status))j.status="Follow-up Required";["requirements","objections","next_steps"].forEach(k=>{if(!Array.isArray(j[k]))j[k]=[]});j.summary=String(j.summary||"");j.reason=String(j.reason||"");return j}
+ catch(e){return{summary:"Summary could not be generated automatically.",requirements:[],objections:[],next_steps:["Review the transcript manually"],status:"Follow-up Required",reason:"AI summary unavailable."}}}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ul=a=>a.length?"<ul>"+a.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul>":"<div class=mu>None noted</div>";
+function callHTML(c,open){const s=c.summary;return `<h3 style="margin-top:0">Call result <span class="badge ${cls(s.status)}">${esc(s.status)}</span></h3><div class="mu">${new Date(c.date).toLocaleString()} · ${fmt(c.dur)} · ${L[c.lang].lg} · ${esc(s.reason)}</div>
+<h4>Summary</h4><p>${esc(s.summary)}</p><h4>Customer requirements</h4>${ul(s.requirements)}<h4>Objections</h4>${ul(s.objections)}<h4>Next steps</h4>${ul(s.next_steps)}
+<h4>Recording</h4>${c.blob?'<audio controls></audio><div class=mu>Microphone side only.</div>':'<div class=mu>No audio was recorded.</div>'}
+<h4>Transcript</h4><div>${c.msgs.map(m=>`<p style="margin:4px 0"><b>${m.r=="bot"?"Bot":"Customer"}:</b> ${esc(m.t)}</p>`).join("")||"<span class=mu>Empty</span>"}</div>`}
+function bindAudio(el,c){const a=el.querySelector("audio");if(a&&c.blob)a.src=URL.createObjectURL(c.blob)}
+async function renderHist(){const h=$("hist");const all=await dbAll();if(!all.length){h.innerHTML='<div class="card mu">No calls yet. Make your first call from the Call tab.</div>';return}
+ h.innerHTML="";all.forEach(c=>{const d=document.createElement("details");d.innerHTML=`<summary>${new Date(c.date).toLocaleString()} · ${fmt(c.dur)} · <span class="badge ${cls(c.summary.status)}">${esc(c.summary.status)}</span></summary><div style="margin-top:10px">${callHTML(c)}</div>`;d.ontoggle=()=>d.open&&bindAudio(d,c);h.appendChild(d)})}
+</script></body></html>
