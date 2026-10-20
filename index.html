@@ -79,10 +79,8 @@ function speak(text){return new Promise(res=>{const g=S.gen;stopRec();status("Sp
 // speech in
 function stopRec(){clearTimeout(S.silT);if(S.rec){S.rec.onend=null;S.rec.onresult=null;try{S.rec.abort()}catch(e){}S.rec=null}}
 function listen(){if(!S.on)return;const g=S.gen;stopRec();status("Listening");const r=new SR();S.rec=r;r.lang=L[S.lang].code;r.continuous=true;r.interimResults=true;let got=false;
-r.onresult=e=>{let fin="",it="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;e.results[i].isFinal?fin+=t:it+=t}
- if(it||fin){got=true;clearTimeout(S.silT)}
- if(it&&!fin)bubble("cus",it,true);
- if(fin.trim()){clearInt();stopRec();S.fails=0;userSaid(fin.trim())}};
+let tm=0;const send=t=>{if(!S.on||S.rec!==r||!t.trim())return;clearInt();stopRec();S.fails=0;userSaid(t.trim())};
+r.onresult=e=>{const res=Array.from(e.results);const txt=res.map(x=>x[0].transcript).join(" ").trim();if(!txt)return;got=true;clearTimeout(S.silT);bubble("cus",txt,true);clearTimeout(tm);tm=setTimeout(()=>send(txt),res[res.length-1].isFinal?500:1800)};
 r.onerror=e=>{if(e.error=="not-allowed"||e.error=="service-not-allowed"){alert("Microphone permission was denied. Please allow microphone access and try again.");endCall()}};
 r.onend=()=>{if(S.on&&S.rec===r&&g==S.gen&&S.status=="Listening")setTimeout(()=>{if(S.rec===r)listen()},150)};
 try{r.start()}catch(e){}
