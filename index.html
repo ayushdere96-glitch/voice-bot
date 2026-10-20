@@ -46,7 +46,7 @@ details{border:1px solid var(--bd);border-radius:12px;padding:10px 14px;margin-b
 <button class="btn" id="agree" disabled>I agree</button></div></div>
 <script>
 const $=id=>document.getElementById(id);
-async function ask(prompt){const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt})});if(!r.ok)throw new Error("api");return (await r.json()).text}
+async function ask(prompt){const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt})});if(!r.ok){let m="";try{m=JSON.stringify(await r.json()).slice(0,300)}catch(e){}throw new Error("HTTP "+r.status+" "+m)}return (await r.json()).text}
 function parseJ(t){return JSON.parse(t.replace(/```json|```/g,"").trim())}
 const KB=`Product: FlowDesk, a CRM and sales automation tool for small and mid-size teams.
 Features: contact and deal pipeline, automated follow-up emails, WhatsApp and email integration, sales reports dashboard, task reminders.
@@ -93,7 +93,7 @@ function bubbleBot(t){S.msgs.push({r:"bot",t});bubble("bot",t)}
 async function userSaid(t){S.msgs.push({r:"cus",t});bubble("cus",t);status("Thinking");const g=S.gen;let reply;
  try{ const convo=S.msgs.map(m=>(m.r=="bot"?"Riya: ":"Customer: ")+m.t).join("\n");
  reply=(await ask(`You are Riya, a friendly sales rep on a live voice call selling FlowDesk. Reply in ${L[S.lang].lg}${S.lang=="hi"?" (Devanagari script)":""}. Use 1 to 3 short spoken sentences, no lists or markdown. Flow: ask discovery questions about their business, explain only relevant features, handle objections empathetically, then offer the free trial or a demo and ask for name and email if interested. Never invent features, discounts or facts beyond the knowledge base. Never be pushy; if they decline, accept politely and say goodbye.\n\nKNOWLEDGE BASE:\n${KB}\n\nCONVERSATION SO FAR:\n${convo}\n\nWrite only Riya’s next reply.`)).trim()}
- catch(e){reply=S.lang=="hi"?"माफ़ कीजिए, कनेक्शन में दिक्कत है। क्या आप दोबारा बोल सकते हैं?":"Sorry, I had a connection hiccup. Could you say that again?"}
+ catch(e){console.error(e);bubble("bot","⚠ Error: "+(e&&e.message||e));reply=S.lang=="hi"?"माफ़ कीजिए, कनेक्शन में दिक्कत है। क्या आप दोबारा बोल सकते हैं?":"Sorry, I had a connection hiccup. Could you say that again?"}
  if(!S.on||g!=S.gen)return;bubbleBot(reply);if(await speak(reply))listen()}
 // call lifecycle
 const fmt=s=>String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
